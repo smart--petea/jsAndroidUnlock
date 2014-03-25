@@ -1,0 +1,234 @@
+<html>
+	<head>
+		<script type="text/javascript" src="http://raphaeljs.com/raphael.js"></script>
+	</head>
+	<body>
+		<div id="holder"></div>
+	</body>
+	<script type="text/javascript">
+		function Circle(canvas, x, y, radius) {
+			//x, y - cicle coordinates
+			//radius - bigCircle radius
+
+			if(!(canvas instanceof Raphael)) {
+				throw "canvas must be Raphael instance";
+			}
+
+			this.canvas = canvas;
+
+			this.x = x = x || 0;
+			this.y = y = y || 0;
+			this.bigRadius  = radius || 0;
+			this.goodColor = "#60F63B";
+			this.init();
+		}
+
+		Circle.prototype = {
+			'init': function(x, y) {
+				var canvas = this.canvas,
+					x = this.x,
+					y = this.y,
+					bigRadius = this.bigRadius,
+					smallRadius = bigRadius / 10,
+					strokewidth = 2,
+					that = this;
+
+				that.isPassive = true;
+				var bigCircle = this.bigCircle = canvas.circle(x, y, bigRadius);
+				bigCircle.attr({
+					"stroke-width": 0,
+					"stroke": this.goodColor,
+					"fill": "#000",
+					"cursor": "pointer",
+				});
+				
+
+				bigCircle.mouseover(function() {
+					for(var i = 0; i < that.msOverClbk.length; i++) {
+						that.msOverClbk[i].call(null, that);
+					}
+
+					if(that.isPassive) {
+						that.isPassive = false;
+						bigCircle.attr({
+							"r": bigRadius / 2,
+						});
+						bigCircle.animate({
+							"r": bigRadius,
+							"stroke-width": strokewidth,
+						}, 50);
+					}
+
+				});
+
+				bigCircle.click(function() {
+						for(var i = 0; i < that.msClickClbk.length; i++) {
+							that.msClickClbk[i].call(null, that);
+						}
+				});
+
+				var smallCircle = this.smallCircle = canvas.circle(x, y, smallRadius); 
+				smallCircle.attr({
+					"stroke-width": strokewidth,
+					"stroke": "#B3B3B3",
+					'pointer-events': 'none',
+				});
+			},
+
+			'mouseover': function(callback) {
+				this.msOverClbk = this.msOverClbk || [];
+				this.msOverClbk.push(callback);
+
+			},
+
+			'click': function(callback) {
+				this.msClickClbk = this.msClickClbk || [];
+				this.msClickClbk.push(callback);
+			},
+
+			'reset': function() {
+				this.isPassive = true;
+				this.bigCircle.attr({
+						"stroke": this.goodColor,
+						"stroke-width": "0",
+						'r': this.bigRadius,
+				});
+			},
+
+			'forceReset': function() {
+				var bigCircle = this.bigCircle;
+				var that = this;
+				bigCircle.attr({
+						"stroke": "red",
+				});
+
+				bigCircle.animate({
+						'r': that.bigRadius / 2,
+				}, 30, function() {
+					that.reset();
+				});
+
+			},
+		}
+
+
+		function LockScreen(canvas){
+			if(!(canvas instanceof Raphael)) {
+				throw "canvas must be of Raphael instance";
+			}
+
+			var x = 100, 
+			    y = 150, 
+			    radius = this.radius = 50, 
+			    stepX = 2 * radius + 30, 
+			    stepY = stepX;
+
+			this.canvas = canvas;
+			this.circles = new Array;
+			this.results = new Array;
+			this.lines = new Array;
+			var that = this;
+
+			for(var i = 0; i < 9; i++) {
+				var circle = this.circles[i] = new Circle(canvas, x + (i % 3) * stepX, Math.floor(i / 3) * stepY + y, radius);
+				circle.mouseover((function(j) { return function(element) {
+						var i = j;
+						if(element.isPassive) {
+							that.drawLine(element.x, element.y);
+							that.results.push(i);
+						};
+				}})(i));
+
+				circle.click(function() {
+						that.reset(true);
+				});
+			}			
+		}
+
+		LockScreen.prototype = {
+			"drawLine": function(x, y) {
+				var len = this.results.length;
+				if(len === 0) return;
+				var index = this.results[len - 1];
+				var circle = this.circles[index];
+				var line = this.canvas.path([
+						"M ",
+						x,
+						",",
+						y,
+						" L ",
+						circle.x,
+						",",
+						circle.y	
+				].join(""));
+
+				line.attr({
+						"fill": "#fff",
+						"stroke": "#fff",
+						'stroke-width': (this.radius / 9.9) ,
+						'stroke-linecap': 'round',
+						'stroke-linejoin': 'round',
+				});
+				this.lines.push(line);
+			},	
+
+			'reset': function(forced) {
+				this.results = new Array;
+				for(var i = 0; i < this.lines.length; i++) {
+					this.lines[i].remove();
+				}
+				this.lines = new Array;
+
+				for(var i = 0; i < this.circles.length; i++) {
+					if(forced) {
+						this.circles[i].forceReset();
+					} else {
+						this.circles[i].reset();
+					}
+				}
+			},
+		};
+
+		var canvWidth = 900, 
+			canvHeight = 900;
+		var paper = Raphael("holder", canvWidth, canvHeight);
+		var rect = paper.rect(0, 0, canvWidth, canvHeight);
+		rect.attr({
+			fill: "#000",
+			"stroke-width": "0",
+		});
+
+		var lockScreen = new LockScreen(paper);
+
+		var rectUnder = paper.rect(90, 30, 100, 40, 10);
+		rectUnder.attr({
+				fill: "blue",
+				'cursor': 'pointer',
+				'opacity': '0.01',
+		});
+
+
+		var text = paper.text(140, 48, "reset");
+		text.attr({
+				fill: "#fff",
+				'font-size': '26px',
+				'text-anchor': 'middle',
+				'cursor': 'pointer',
+				'pointer-events': 'none',
+		});
+
+		var rect = paper.rect(90, 30, 100, 40, 10);
+		rect.attr({
+				fill: "blue",
+				'cursor': 'pointer',
+				'opacity': '0.01',
+		});
+
+		rect.click(function() {
+				lockScreen.reset();
+		});
+
+
+
+	</script>
+</html>
